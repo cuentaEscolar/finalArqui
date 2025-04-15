@@ -1,0 +1,18 @@
+
+{
+    "NetworkInterfaces": [{
+        "AssociatePublicIpAddress": false,
+        "DeviceIndex": 0,
+        "Ipv6AddressCount": 0,
+        "SubnetId": "subnet-0d63a5062827ccd64"
+    }],
+    "ImageId": "ami-00a929b66ed6e0de6",
+    "InstanceType": "t2.micro",
+    "TagSpecifications": [{
+        "ResourceType": "instance",
+        "Tags": [{
+            "Key":"Name",
+            "Value":"balance"
+        }]
+    }]
+}
