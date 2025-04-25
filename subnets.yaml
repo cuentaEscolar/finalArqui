@@ -1,0 +1,84 @@
+Resources:
+  # Create a VPC
+  PublicVPC:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: 10.0.0.0/16
+
+  PrivateVPC:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: 172.16.0.0/20
+  # Create and attach InternetGateway
+  InternetGateway:
+    Type: AWS::EC2::InternetGateway
+    DependsOn: MainVPC
+
+  AttachIGW:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      VpcId: !Ref MainVPC
+      InternetGatewayId: !Ref InternetGateway
+
+  # Create First Subnet
+  FirstPublicSubnet:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref MainVPC
+      CidrBlock: 172.16.10.0/24
+      AvailabilityZone: "us-east-1a"
+      Tags:
+      - Key: Name
+        Value: Public Subnet A - SFID
+
+  # Creating additional subnet
+    Type: AWS::EC2::Subnet
+  SecondPublicSubnet:
+    Properties:
+      VpcId: !Ref MainVPC
+      CidrBlock: 172.16.20.0/24
+      AvailabilityZone: "us-east-a"
+      Tags:
+      - Key: Name
+        Value: Public Subnet B - SFID
+
+  FirstPrivateSubnet:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref MainVPC
+      CidrBlock: 10.0.20.0/24
+      AvailabilityZone: "us-east-a"
+      Tags:
+      - Key: Name
+        Value: Private Subnet A - SFID
+
+
+  SecondPrivateSubnet:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref MainVPC
+      CidrBlock: 10.0.20.0/24
+      AvailabilityZone: "us-east-a"
+      Tags:
+      - Key: Name
+        Value: Public Subnet B - SFID
+
+  PublicAlb:
+    Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+    Properties:
+      IpAddressType: "ipv4" 
+      LoadBalancerAttributes: 
+        - LoadBalancerAttribute
+      MinimumLoadBalancerCapacity: 
+        CapacityUnits: 25
+      Name: "our_public_load_balancer"
+      Scheme: String
+      SecurityGroups: 
+        - String
+      SubnetMappings: 
+        - SubnetMapping
+      Subnets: 
+        - String
+      Tags: 
+        - Tag
+      Type: String

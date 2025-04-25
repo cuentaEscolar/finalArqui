@@ -1,0 +1,41 @@
+Type: AWS::AutoScaling::AutoScalingGroup
+Properties:
+  AutoScalingGroupName: String
+  AvailabilityZones: 
+    - "us-east-1a"
+  Context: String
+  Cooldown: String
+  DefaultInstanceWarmup: 0
+  DesiredCapacity: "0"
+  DesiredCapacityType: "memory-mib"
+  LaunchTemplate: 
+    LaunchTemplateId: ""
+    LaunchTemplateName: "LaunchTemplatEc2Micro"
+    Version: "1"
+  LifecycleHookSpecificationList: 
+    - LifecycleHookSpecification
+  LoadBalancerNames: 
+    - String
+  MaxInstanceLifetime: Integer
+  MaxSize: String
+  MetricsCollection: 
+    - MetricsCollection
+  MinSize: String
+  MixedInstancesPolicy: 
+    MixedInstancesPolicy
+  NewInstancesProtectedFromScaleIn: Boolean
+  NotificationConfigurations: 
+    - NotificationConfiguration
+  PlacementGroup: String
+  ServiceLinkedRoleARN: String
+  SkipZonalShiftValidation: Boolean
+  Tags: 
+    - TagProperty
+  TargetGroupARNs: 
+    - String
+  TerminationPolicies: 
+    - String
+  TrafficSources: 
+    - TrafficSourceIdentifier
+  VPCZoneIdentifier: 
+    - String
