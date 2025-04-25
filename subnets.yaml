@@ -12,7 +12,7 @@ Resources:
   # Create and attach InternetGateway
   InternetGateway:
     Type: AWS::EC2::InternetGateway
-    DependsOn: MainVPC
+    DependsOn: PublicVPC
 
   AttachIGW:
     Type: AWS::EC2::VPCGatewayAttachment

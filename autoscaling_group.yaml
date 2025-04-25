@@ -9,8 +9,8 @@ Properties:
   DesiredCapacity: "0"
   DesiredCapacityType: "memory-mib"
   LaunchTemplate: 
-    LaunchTemplateId: ""
-    LaunchTemplateName: "LaunchTemplatEc2Micro"
+    LaunchTemplateId: !Ref "LaunchTemplateEc2Micro" 
+    LaunchTemplateName: "LaunchTemplateEc2Micro"
     Version: "1"
   LifecycleHookSpecificationList: 
     - LifecycleHookSpecification
