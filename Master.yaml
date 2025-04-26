@@ -241,8 +241,8 @@ Resources:
       LaunchTemplateData:
         ImageId: ami-00a929b66ed6e0de6
         InstanceType: t2.micro
-        IamInstanceProfile:
-          Name: !Ref myInstanceProfile
+        #IamInstanceProfile:
+          #Name: !Ref myInstanceProfile
         SecurityGroupIds:
         - !Ref SSHSecurityGroup
         - sg-083cd3bfb8example
@@ -298,6 +298,22 @@ Resources:
       Roles:
       - !Ref myInstanceRole
 
+#---------------------------------  Application Load Balancer --------------------------
+  IncomingTrafficLoadBalancer:
+    Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+    Properties:
+      IpAddressType: ipv4
+      #LoadBalancerAttributes: 
+      #  - LoadBalancerAttribute
+      Name: IncomingTrafficLoadBalancer
+      Scheme: internet-facing
+      Subnets: 
+        - !Ref FirstPublicSubnet
+        - !Ref SecondPublicSubnet
+      #Tags: 
+        #- Tag
+      Type: application
+
 #--------------------------------------Auto Scaling Group-------------------------------
   WebServerASG:
     Type: AWS::AutoScaling::AutoScalingGroup
@@ -306,39 +322,21 @@ Resources:
       AutoScalingGroupName: !Sub ${AWS::StackName}-ASG
       AvailabilityZones: 
         - "us-east-1a"
-      Context: String
-      Cooldown: String
       DefaultInstanceWarmup: 0
-      DesiredCapacity: "0"
-      DesiredCapacityType: "memory-mib"
+      DesiredCapacity: 1
+      DesiredCapacityType: vcpu
       LaunchTemplate: 
         LaunchTemplateId: !Ref LaunchTemplateEc2Micro
         Version: !GetAtt LaunchTemplateEc2Micro.LatestVersionNumber
-      LifecycleHookSpecificationList: 
-        - LifecycleHookSpecification
-      LoadBalancerNames: 
-        - String
-      MaxInstanceLifetime: Integer
-      MaxSize: String
-      MetricsCollection: 
-        - MetricsCollection
-      MinSize: String
-      MixedInstancesPolicy: 
-        MixedInstancesPolicy
-      NewInstancesProtectedFromScaleIn: Boolean
-      NotificationConfigurations: 
-        - NotificationConfiguration
-      PlacementGroup: String
-      ServiceLinkedRoleARN: String
-      SkipZonalShiftValidation: Boolean
-      Tags: 
-        - TagProperty
+      MaxSize: 4
+      MinSize: 1
+      NewInstancesProtectedFromScaleIn: false
+      #PlacementGroup: String
+      #ServiceLinkedRoleARN: String
+      #Tags: 
+        #- TagProperty
       TargetGroupARNs: 
-        - String
-      TerminationPolicies: 
-        - String
-      TrafficSources: 
-        - TrafficSourceIdentifier
+        - !Ref IncomingTrafficLoadBalancer
       VPCZoneIdentifier:
       - !Ref FirstPrivateSubnet
       - !Ref SecondPrivateSubnet
