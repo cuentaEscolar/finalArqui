@@ -1,0 +1,362 @@
+Description: IaC for final project
+Resources:
+  # Creating the VPC
+  MainVPC:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: 10.0.0.0/16
+      EnableDnsHostnames: 'true'
+      EnableDnsSupport: 'true'
+      Tags:
+      - Key: Name
+        Value: VPC for the final project
+
+  # Creation and attaching of InternetGateway
+  InternetGateway:
+    Type: AWS::EC2::InternetGateway
+    DependsOn: MainVPC
+
+  AttachIGW:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      VpcId: !Ref MainVPC
+      InternetGatewayId: !Ref InternetGateway
+
+  # Creation of Public subnet A in the Availability Zone One: us-east-1a
+  FirstPublicSubnet:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref MainVPC
+      CidrBlock: 10.0.0.0/24
+      AvailabilityZone: "us-east-1a"
+      Tags:
+      - Key: Name
+        Value: Public Subnet A - From Availability Zone one
+        
+  # Creation of Public subnet B in the Availability Zone One: us-east-1b
+  SecondPublicSubnet:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref MainVPC
+      CidrBlock: 10.0.1.0/24
+      AvailabilityZone: "us-east-1b"
+      Tags:
+      - Key: Name
+        Value: Public Subnet B - From Availability Zone two
+
+  # Creation of Private subnet A in the Availability Zone One: us-east-1a
+  FirstPrivateSubnet:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref MainVPC
+      CidrBlock: 10.0.2.0/24
+      AvailabilityZone: "us-east-1a"
+      Tags:
+      - Key: Name
+        Value: Private Subnet A - From Availability Zone one 
+
+  # Creation of Private subnet B in the Availability Zone One: us-east-1a
+  SecondPrivateSubnet:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref MainVPC
+      CidrBlock: 10.0.3.0/24
+      AvailabilityZone: "us-east-1a"
+      Tags:
+      - Key: Name
+        Value: Private Subnet B - From Availability Zone one 
+
+  # Creation of Private subnet C in the Availability Zone One: us-east-1b
+  ThirdPrivateSubnet:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref MainVPC
+      CidrBlock: 10.0.4.0/24
+      AvailabilityZone: "us-east-1b"
+      Tags:
+      - Key: Name
+        Value: Private Subnet C - From Availability Zone two
+
+  # Creation of Private subnet D in the Availability Zone One: us-east-1b
+  FourthPrivateSubnet:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref MainVPC
+      CidrBlock: 10.0.5.0/24
+      AvailabilityZone: "us-east-1b"
+      Tags:
+      - Key: Name
+        Value: Private Subnet D - From Availability Zone two
+
+  #Part of creating NatGateways an elastic ip addresses
+
+  # Elastic IP for NAT Gateway in AZ1 (us-east-1a)
+  NatEIPAZ1:
+    Type: AWS::EC2::EIP
+    Properties:
+      Domain: vpc
+
+  # NAT Gateway in Public Subnet A (us-east-1a)
+  NatGatewayAZ1:
+    Type: AWS::EC2::NatGateway
+    DependsOn: AttachIGW
+    Properties:
+      AllocationId: !GetAtt NatEIPAZ1.AllocationId
+      SubnetId: !Ref FirstPublicSubnet
+      Tags:
+      - Key: Name
+        Value: NAT Gateway in the Availability Zone One
+
+  # Elastic IP for NAT Gateway in AZ2 (us-east-1b)
+  NatEIPAZ2:
+    Type: AWS::EC2::EIP
+    Properties:
+      Domain: vpc
+
+  # NAT Gateway in Public Subnet B (us-east-1b)
+  NatGatewayAZ2:
+    Type: AWS::EC2::NatGateway
+    DependsOn: AttachIGW
+    Properties:
+      AllocationId: !GetAtt NatEIPAZ2.AllocationId
+      SubnetId: !Ref SecondPublicSubnet
+      Tags:
+      - Key: Name
+        Value: NAT Gateway in the Availability Zone two
+
+  #Creation of public route table and private route table
+
+  # Public Route Table
+  PublicRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref MainVPC
+      Tags:
+      - Key: Name
+        Value: Public Route Table for Internet Gateway 
+
+  # Public Route (0.0.0.0/0 to Internet Gateway)
+  PublicRoute:
+    Type: AWS::EC2::Route
+    Properties:
+      RouteTableId: !Ref PublicRouteTable
+      DestinationCidrBlock: 0.0.0.0/0 #this allow access to internet
+      GatewayId: !Ref InternetGateway
+
+  # Associations for Public Subnet A and B
+  PublicSubnetARouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref FirstPublicSubnet
+      RouteTableId: !Ref PublicRouteTable
+
+  PublicSubnetBRouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref SecondPublicSubnet
+      RouteTableId: !Ref PublicRouteTable
+
+  # Private Route Table for AZ1 (us-east-1a)
+  PrivateRouteTableAZ1:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref MainVPC
+      Tags:
+      - Key: Name
+        Value: Private Route Table in the Availability Zone One
+
+  # Route to NAT Gateway AZ1
+  PrivateRouteToNATAZ1:
+    Type: AWS::EC2::Route
+    Properties:
+      RouteTableId: !Ref PrivateRouteTableAZ1
+      DestinationCidrBlock: 0.0.0.0/0 #to anywhere
+      NatGatewayId: !Ref NatGatewayAZ1
+
+  # Associate Private Subnet A and B (AZ1) with Private Route Table AZ1
+  PrivateSubnetARouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref FirstPrivateSubnet
+      RouteTableId: !Ref PrivateRouteTableAZ1
+
+  PrivateSubnetBRouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref SecondPrivateSubnet
+      RouteTableId: !Ref PrivateRouteTableAZ1
+
+  # Private Route Table for AZ2 (us-east-1b)
+  PrivateRouteTableAZ2:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref MainVPC
+      Tags:
+      - Key: Name
+        Value: Private Route Table in the Availability Zone two
+
+  # Route to NAT Gateway AZ2
+  PrivateRouteToNATAZ2:
+    Type: AWS::EC2::Route
+    Properties:
+      RouteTableId: !Ref PrivateRouteTableAZ2
+      DestinationCidrBlock: 0.0.0.0/0 #to anywhere
+      NatGatewayId: !Ref NatGatewayAZ2
+
+  # Associate Private Subnet C and D (AZ2) with Private Route Table AZ2
+  PrivateSubnetCRouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref ThirdPrivateSubnet
+      RouteTableId: !Ref PrivateRouteTableAZ2
+
+  PrivateSubnetDRouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref FourthPrivateSubnet
+      RouteTableId: !Ref PrivateRouteTableAZ2
+
+
+  #security group creation to allow via SSH connection to the EC2's
+  SSHSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Enable SSH access
+      VpcId: !Ref MainVPC
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+          CidrIp: 0.0.0.0/0  # Here we can modified the CIDRIP to only allow connection with our IP instead pf anywhere
+      Tags:
+        - Key: Name
+          Value: SSH Security Group to aneable SSH access
+
+#------------------------------------------------EC2_TEMPLATE-----------------------------------------------
+  LaunchTemplateEc2Micro:
+    Type: AWS::EC2::LaunchTemplate
+    DependsOn: SSHSecurityGroup
+    Properties:
+      LaunchTemplateName: !Sub ${AWS::StackName}-launch-template
+      LaunchTemplateData:
+        ImageId: ami-00a929b66ed6e0de6
+        InstanceType: t2.micro
+        IamInstanceProfile:
+          Name: !Ref myInstanceProfile
+        SecurityGroupIds:
+        - !Ref SSHSecurityGroup
+        - sg-083cd3bfb8example
+        IamInstanceProfile:
+          Arn: !GetAtt WebAppInstanceProfile.Arn # Opcional (solo si necesitas acceso a AWS)
+        UserData: 
+          Fn::Base64: |
+            #!/bin/bash
+            # Instalar dependencias
+            yum update -y
+            yum install -y httpd php mysql unzip
+            systemctl start httpd
+            systemctl enable httpd
+
+            # Descargar y descomprimir el ZIP desde el enlace público
+            wget https://aws-tc-largeobjects.s3.us-west-2.amazonaws.com/CUR-TF-200-ACACAD-3-113230/22-lab-Capstone-project/s3/Example.zip -O /tmp/webapp.zip
+            unzip /tmp/webapp.zip -d /var/www/html/
+
+            # Ajustar permisos
+            chown -R apache:apache /var/www/html/
+            chmod -R 755 /var/www/html/
+
+            # Reiniciar Apache
+            systemctl restart httpd
+        TagSpecifications:
+        - ResourceType: instance
+          Tags:
+          - Key: environment
+            Value: development
+        - ResourceType: volume
+          Tags:
+          - Key: environment
+            Value: development
+  myInstanceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: InstanceRole
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+        - Effect: 'Allow'
+          Principal:
+            Service:
+            - 'ec2.amazonaws.com'
+          Action:
+          - 'sts:AssumeRole'
+      ManagedPolicyArns:
+        - 'arn:aws:iam::aws:policy/myCustomerManagedPolicy'
+  myInstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      Path: '/'
+      Roles:
+      - !Ref myInstanceRole
+
+#--------------------------------------Auto Scaling Group-------------------------------
+  WebServerASG:
+    Type: AWS::AutoScaling::AutoScalingGroup
+    DependsOn: LaunchTemplateEc2Micro
+    Properties:
+      AutoScalingGroupName: !Sub ${AWS::StackName}-ASG
+      AvailabilityZones: 
+        - "us-east-1a"
+      Context: String
+      Cooldown: String
+      DefaultInstanceWarmup: 0
+      DesiredCapacity: "0"
+      DesiredCapacityType: "memory-mib"
+      LaunchTemplate: 
+        LaunchTemplateId: !Ref LaunchTemplateEc2Micro
+        Version: !GetAtt LaunchTemplateEc2Micro.LatestVersionNumber
+      LifecycleHookSpecificationList: 
+        - LifecycleHookSpecification
+      LoadBalancerNames: 
+        - String
+      MaxInstanceLifetime: Integer
+      MaxSize: String
+      MetricsCollection: 
+        - MetricsCollection
+      MinSize: String
+      MixedInstancesPolicy: 
+        MixedInstancesPolicy
+      NewInstancesProtectedFromScaleIn: Boolean
+      NotificationConfigurations: 
+        - NotificationConfiguration
+      PlacementGroup: String
+      ServiceLinkedRoleARN: String
+      SkipZonalShiftValidation: Boolean
+      Tags: 
+        - TagProperty
+      TargetGroupARNs: 
+        - String
+      TerminationPolicies: 
+        - String
+      TrafficSources: 
+        - TrafficSourceIdentifier
+      VPCZoneIdentifier:
+      - !Ref FirstPrivateSubnet
+      - !Ref SecondPrivateSubnet
+      - !Ref ThirdPrivateSubnet
+      - !Ref FourthPrivateSubnet
+
+Outputs:
+  VPCID:
+    Description: ID de la VPC creada
+    Value: !Ref MainVPC
+    
+  ASGName:
+    Description: Nombre del Auto Scaling Group
+    Value: !Ref WebServerASG
+
+  LaunchTemplateName:
+    Description: Nombre del Launch Template
+    Value: !Ref LaunchTemplateEc2Micro
+
+
+

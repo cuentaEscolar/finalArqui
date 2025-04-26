@@ -1,10 +1,10 @@
 Resources:
-  LaunchTemplatEc2Micro:
+  LaunchTemplateEc2Micro:
     Type: AWS::EC2::LaunchTemplate
     Properties:
       LaunchTemplateName: !Sub ${AWS::StackName}-launch-template
       LaunchTemplateData:
-        ImageID: ami-00a929b66ed6e0de6
+        ImageId: ami-00a929b66ed6e0de6
         InstanceType: t2.micro
         IamInstanceProfile:
           Name: !Ref myInstanceProfile
