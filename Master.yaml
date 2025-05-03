@@ -33,13 +33,13 @@ Resources:
       - Key: Name
         Value: Public Subnet A - From Availability Zone one
         
-  # Creation of Public subnet B in the Availability Zone One: us-east-1b
+  # Creation of Public subnet B in the Availability Zone One: us-east-2b
   SecondPublicSubnet:
     Type: AWS::EC2::Subnet
     Properties:
       VpcId: !Ref MainVPC
       CidrBlock: 10.0.1.0/24
-      AvailabilityZone: "us-east-1b"
+      AvailabilityZone: "us-east-2b"
       Tags:
       - Key: Name
         Value: Public Subnet B - From Availability Zone two
@@ -66,24 +66,24 @@ Resources:
       - Key: Name
         Value: Private Subnet B - From Availability Zone one 
 
-  # Creation of Private subnet C in the Availability Zone One: us-east-1b
+  # Creation of Private subnet C in the Availability Zone One: us-east-2b
   ThirdPrivateSubnet:
     Type: AWS::EC2::Subnet
     Properties:
       VpcId: !Ref MainVPC
       CidrBlock: 10.0.4.0/24
-      AvailabilityZone: "us-east-1b"
+      AvailabilityZone: "us-east-2b"
       Tags:
       - Key: Name
         Value: Private Subnet C - From Availability Zone two
 
-  # Creation of Private subnet D in the Availability Zone One: us-east-1b
+  # Creation of Private subnet D in the Availability Zone One: us-east-2b
   FourthPrivateSubnet:
     Type: AWS::EC2::Subnet
     Properties:
       VpcId: !Ref MainVPC
       CidrBlock: 10.0.5.0/24
-      AvailabilityZone: "us-east-1b"
+      AvailabilityZone: "us-east-2b"
       Tags:
       - Key: Name
         Value: Private Subnet D - From Availability Zone two
@@ -107,13 +107,13 @@ Resources:
       - Key: Name
         Value: NAT Gateway in the Availability Zone One
 
-  # Elastic IP for NAT Gateway in AZ2 (us-east-1b)
+  # Elastic IP for NAT Gateway in AZ2 (us-east-2b)
   NatEIPAZ2:
     Type: AWS::EC2::EIP
     Properties:
       Domain: vpc
 
-  # NAT Gateway in Public Subnet B (us-east-1b)
+  # NAT Gateway in Public Subnet B (us-east-2b)
   NatGatewayAZ2:
     Type: AWS::EC2::NatGateway
     DependsOn: AttachIGW
@@ -186,7 +186,7 @@ Resources:
       SubnetId: !Ref SecondPrivateSubnet
       RouteTableId: !Ref PrivateRouteTableAZ1
 
-  # Private Route Table for AZ2 (us-east-1b)
+  # Private Route Table for AZ2 (us-east-2b)
   PrivateRouteTableAZ2:
     Type: AWS::EC2::RouteTable
     Properties:
@@ -232,6 +232,66 @@ Resources:
         - Key: Name
           Value: SSH Security Group to aneable SSH access
 
+#------------------------------------------------RDS--------------------------------------
+  DBSecret:
+      Type: AWS::SecretsManager::Secret
+      Properties:
+        Name: !Sub ${AWS::StackName}-db-credentials
+        GenerateSecretString:
+          SecretStringTemplate: '{"username": "admin"}'
+          GenerateStringKey: "password"
+          PasswordLength: 16
+          ExcludeCharacters: '"@/\'
+
+
+
+  MyDatabaseSecurityGroup:
+      Type: AWS::EC2::SecurityGroup
+      Properties:
+        GroupDescription: Enable MySQL access
+        VpcId: !Ref MainVPC
+        SecurityGroupIngress:
+          - IpProtocol: tcp
+            FromPort: 3306
+            ToPort: 3306
+            #CidrIp: 10.0.0.0/16
+        Tags:
+          - Key: Name
+            Value: !Ref SSHSecurityGroup
+
+  DBSubnetGroup:
+    Type: AWS::RDS::DBSubnetGroup
+    Properties:
+      DBSubnetGroupDescription: "Subredes privadas para la base de datos"
+      SubnetIds:
+        - !Ref ThirdPrivateSubnet #subnet C
+        - !Ref FourthPrivateSubnet #subnet D
+      Tags:
+        - Key: Name
+          Value: !Sub ${AWS::StackName}-db-subnet-group
+
+  MyDatabase:
+    Type: AWS::RDS::DBInstance
+    DependsOn: 
+      - MyDatabaseSecurityGroup
+      - DBSecret
+    DeletionPolicy: 'Delete'
+    UpdateReplacePolicy: 'Delete'
+    Properties:
+      DBInstanceIdentifier: countries-1
+      AllocatedStorage: 20
+      DBInstanceClass: db.t3.micro
+      Engine: mysql
+      MasterUsername: !Sub '{{resolve:secretsmanager:${DBSecret}::username}}'
+      MasterUserPassword: !Sub '{{resolve:secretsmanager:${DBSecret}::password}}'
+      VPCSecurityGroups:
+        - !Ref MyDatabaseSecurityGroup
+      DBSubnetGroupName: !Ref DBSubnetGroup
+      BackupRetentionPeriod: 7
+      MultiAZ: true  # Alta disponibilidad en múltiples AZ
+      PubliclyAccessible: false  # Solo accesible en subredes privadas
+    
+
 #------------------------------------------------EC2_TEMPLATE-----------------------------------------------
   LaunchTemplateEc2Micro:
     Type: AWS::EC2::LaunchTemplate
@@ -246,8 +306,8 @@ Resources:
         SecurityGroupIds:
         - !Ref SSHSecurityGroup
         - sg-083cd3bfb8example
-        IamInstanceProfile:
-          Arn: !GetAtt WebAppInstanceProfile.Arn # Opcional (solo si necesitas acceso a AWS)
+        #IamInstanceProfile:
+          #Arn: !GetAtt WebAppInstanceProfile.Arn # Opcional (solo si necesitas acceso a AWS)
         UserData: 
           Fn::Base64: |
             #!/bin/bash
@@ -322,6 +382,7 @@ Resources:
       AutoScalingGroupName: !Sub ${AWS::StackName}-ASG
       AvailabilityZones: 
         - "us-east-1a"
+        - "us-east-2b"
       DefaultInstanceWarmup: 0
       DesiredCapacity: 1
       DesiredCapacityType: vcpu
@@ -340,8 +401,6 @@ Resources:
       VPCZoneIdentifier:
       - !Ref FirstPrivateSubnet
       - !Ref SecondPrivateSubnet
-      - !Ref ThirdPrivateSubnet
-      - !Ref FourthPrivateSubnet
 
 Outputs:
   VPCID:
@@ -355,6 +414,13 @@ Outputs:
   LaunchTemplateName:
     Description: Nombre del Launch Template
     Value: !Ref LaunchTemplateEc2Micro
+
+  DatabaseEndpoint:
+    Description: "Endpoint de la base de datos"
+    Value: !GetAtt MyDatabase.Endpoint.Address
+  SecretARN:
+    Description: "ARN del secreto con credenciales"
+    Value: !Ref DBSecret
 
 
 
