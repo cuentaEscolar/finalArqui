@@ -1,4 +1,9 @@
 Description: IaC for final project
+
+Parameters:
+  InstanceProfileArn:
+    Type: String
+    Description: ARN of the autoscaling group instance profile
 Resources:
   # Creating the VPC
   MainVPC:
@@ -28,7 +33,7 @@ Resources:
     Properties:
       VpcId: !Ref MainVPC
       CidrBlock: 10.0.0.0/24
-      AvailabilityZone: "us-east-1a"
+      AvailabilityZone: !Select [ 0, !GetAZs 'us-east-1' ]
       Tags:
       - Key: Name
         Value: Public Subnet A - From Availability Zone one
@@ -39,7 +44,7 @@ Resources:
     Properties:
       VpcId: !Ref MainVPC
       CidrBlock: 10.0.1.0/24
-      AvailabilityZone: "us-east-2b"
+      AvailabilityZone: !Select [ 1, !GetAZs 'us-east-1' ]
       Tags:
       - Key: Name
         Value: Public Subnet B - From Availability Zone two
@@ -50,7 +55,7 @@ Resources:
     Properties:
       VpcId: !Ref MainVPC
       CidrBlock: 10.0.2.0/24
-      AvailabilityZone: "us-east-1a"
+      AvailabilityZone: !Select [ 0, !GetAZs 'us-east-1' ]
       Tags:
       - Key: Name
         Value: Private Subnet A - From Availability Zone one 
@@ -61,7 +66,7 @@ Resources:
     Properties:
       VpcId: !Ref MainVPC
       CidrBlock: 10.0.3.0/24
-      AvailabilityZone: "us-east-1a"
+      AvailabilityZone: !Select [ 1, !GetAZs 'us-east-1' ]
       Tags:
       - Key: Name
         Value: Private Subnet B - From Availability Zone one 
@@ -72,7 +77,8 @@ Resources:
     Properties:
       VpcId: !Ref MainVPC
       CidrBlock: 10.0.4.0/24
-      AvailabilityZone: "us-east-2b"
+      AvailabilityZone: !Select [ 2, !GetAZs 'us-east-1' ]
+      MapPublicIpOnLaunch: false
       Tags:
       - Key: Name
         Value: Private Subnet C - From Availability Zone two
@@ -83,7 +89,7 @@ Resources:
     Properties:
       VpcId: !Ref MainVPC
       CidrBlock: 10.0.5.0/24
-      AvailabilityZone: "us-east-2b"
+      AvailabilityZone: !Select [ 0, !GetAZs 'us-east-1' ]
       Tags:
       - Key: Name
         Value: Private Subnet D - From Availability Zone two
@@ -233,15 +239,7 @@ Resources:
           Value: SSH Security Group to aneable SSH access
 
 #------------------------------------------------RDS--------------------------------------
-  DBSecret:
-      Type: AWS::SecretsManager::Secret
-      Properties:
-        Name: !Sub ${AWS::StackName}-db-credentials
-        GenerateSecretString:
-          SecretStringTemplate: '{"username": "admin"}'
-          GenerateStringKey: "password"
-          PasswordLength: 16
-          ExcludeCharacters: '"@/\'
+  
 
 
 
@@ -254,7 +252,7 @@ Resources:
           - IpProtocol: tcp
             FromPort: 3306
             ToPort: 3306
-            #CidrIp: 10.0.0.0/16
+            CidrIp: 10.0.0.0/16
         Tags:
           - Key: Name
             Value: !Ref SSHSecurityGroup
@@ -272,18 +270,15 @@ Resources:
 
   MyDatabase:
     Type: AWS::RDS::DBInstance
-    DependsOn: 
-      - MyDatabaseSecurityGroup
-      - DBSecret
     DeletionPolicy: 'Delete'
     UpdateReplacePolicy: 'Delete'
     Properties:
-      DBInstanceIdentifier: countries-1
+      DBInstanceIdentifier: countries-2
       AllocatedStorage: 20
       DBInstanceClass: db.t3.micro
       Engine: mysql
-      MasterUsername: !Sub '{{resolve:secretsmanager:${DBSecret}::username}}'
-      MasterUserPassword: !Sub '{{resolve:secretsmanager:${DBSecret}::password}}'
+      MasterUsername: admin
+      ManageMasterUserPassword: true
       VPCSecurityGroups:
         - !Ref MyDatabaseSecurityGroup
       DBSubnetGroupName: !Ref DBSubnetGroup
@@ -295,19 +290,15 @@ Resources:
 #------------------------------------------------EC2_TEMPLATE-----------------------------------------------
   LaunchTemplateEc2Micro:
     Type: AWS::EC2::LaunchTemplate
-    DependsOn: SSHSecurityGroup
     Properties:
       LaunchTemplateName: !Sub ${AWS::StackName}-launch-template
       LaunchTemplateData:
         ImageId: ami-00a929b66ed6e0de6
         InstanceType: t2.micro
-        #IamInstanceProfile:
-          #Name: !Ref myInstanceProfile
+        IamInstanceProfile:
+          Arn: !Ref InstanceProfileArn
         SecurityGroupIds:
         - !Ref SSHSecurityGroup
-        - sg-083cd3bfb8example
-        #IamInstanceProfile:
-          #Arn: !GetAtt WebAppInstanceProfile.Arn # Opcional (solo si necesitas acceso a AWS)
         UserData: 
           Fn::Base64: |
             #!/bin/bash
@@ -336,27 +327,6 @@ Resources:
           Tags:
           - Key: environment
             Value: development
-  myInstanceRole:
-    Type: AWS::IAM::Role
-    Properties:
-      RoleName: InstanceRole
-      AssumeRolePolicyDocument:
-        Version: '2012-10-17'
-        Statement:
-        - Effect: 'Allow'
-          Principal:
-            Service:
-            - 'ec2.amazonaws.com'
-          Action:
-          - 'sts:AssumeRole'
-      ManagedPolicyArns:
-        - 'arn:aws:iam::aws:policy/myCustomerManagedPolicy'
-  myInstanceProfile:
-    Type: AWS::IAM::InstanceProfile
-    Properties:
-      Path: '/'
-      Roles:
-      - !Ref myInstanceRole
 
 #---------------------------------  Application Load Balancer --------------------------
   IncomingTrafficLoadBalancer:
@@ -382,7 +352,7 @@ Resources:
       AutoScalingGroupName: !Sub ${AWS::StackName}-ASG
       AvailabilityZones: 
         - "us-east-1a"
-        - "us-east-2b"
+        - "us-east-1b"
       DefaultInstanceWarmup: 0
       DesiredCapacity: 1
       DesiredCapacityType: vcpu
@@ -418,9 +388,6 @@ Outputs:
   DatabaseEndpoint:
     Description: "Endpoint de la base de datos"
     Value: !GetAtt MyDatabase.Endpoint.Address
-  SecretARN:
-    Description: "ARN del secreto con credenciales"
-    Value: !Ref DBSecret
 
 
 
