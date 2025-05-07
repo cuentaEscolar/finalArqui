@@ -342,6 +342,18 @@ Resources:
       - !Ref SecondPrivateSubnet
       - !Ref ThirdPrivateSubnet
       - !Ref FourthPrivateSubnet
+  MyDatbaseSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Enable MySQL access
+      VpcId: !Ref MainVPC
+      CidrBlock: !Ref FirstPrivateSubnet
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 3306
+          ToPort: 3306
+          CidrIp: 0.0.0.0/0
+
 
 Outputs:
   VPCID:
