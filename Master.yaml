@@ -238,6 +238,36 @@ Resources:
         - Key: Name
           Value: SSH Security Group to aneable SSH access
 
+  # NUEVO: Security Group para permitir tráfico HTTP al Load Balancer
+  ALBSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Enable HTTP access to ALB
+      VpcId: !Ref MainVPC
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIp: 0.0.0.0/0
+      Tags:
+        - Key: Name
+          Value: ALB Security Group for HTTP access
+
+  # NUEVO: Security Group para permitir tráfico HTTP desde el ALB a las instancias EC2
+  WebServerSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Enable HTTP access from ALB to EC2 instances
+      VpcId: !Ref MainVPC
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          SourceSecurityGroupId: !Ref ALBSecurityGroup
+      Tags:
+        - Key: Name
+          Value: Web Server Security Group for HTTP access from ALB
+
 #------------------------------------------------RDS--------------------------------------
   
 
@@ -299,6 +329,7 @@ Resources:
           Arn: !Ref InstanceProfileArn
         SecurityGroupIds:
         - !Ref SSHSecurityGroup
+        - !Ref WebServerSecurityGroup  # AÑADIDO: Security Group para permitir tráfico HTT
         UserData: 
           Fn::Base64: |
             #!/bin/bash
@@ -333,15 +364,13 @@ Resources:
     Type: AWS::ElasticLoadBalancingV2::LoadBalancer
     Properties:
       IpAddressType: ipv4
-      #LoadBalancerAttributes: 
-      #  - LoadBalancerAttribute
       Name: IncomingTrafficLoadBalancer
       Scheme: internet-facing
+      SecurityGroups:
+        - !Ref ALBSecurityGroup  # AQUÍ: Añadir referencia al Security Group nuevo
       Subnets: 
         - !Ref FirstPublicSubnet
         - !Ref SecondPublicSubnet
-      #Tags: 
-        #- Tag
       Type: application
 
 
@@ -357,7 +386,11 @@ Resources:
       VpcId: !Ref MainVPC
       TargetType: instance
       HealthCheckProtocol: HTTP
-      HealthCheckPath: /
+      HealthCheckPath: /health.html  # AQUÍ: Cambiar a /health.html para usar el archivo específico
+      HealthCheckIntervalSeconds: 30  # AQUÍ: Añadir configuración de health check
+      HealthCheckTimeoutSeconds: 5   # AQUÍ: Añadir configuración de health check
+      HealthyThresholdCount: 2       # AQUÍ: Añadir configuración de health check
+      UnhealthyThresholdCount: 2     # AQUÍ: Añadir configuración de health check
       Matcher:
         HttpCode: 200
 
@@ -417,5 +450,8 @@ Outputs:
     Description: "Endpoint de la base de datos"
     Value: !GetAtt MyDatabase.Endpoint.Address
 
+  LoadBalancerDNS:
+    Description: "DNS del Load Balancer para acceder a la aplicación web"
+    Value: !GetAtt IncomingTrafficLoadBalancer.DNSName
 
 
