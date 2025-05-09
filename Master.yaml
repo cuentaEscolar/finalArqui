@@ -38,13 +38,13 @@ Resources:
       - Key: Name
         Value: Public Subnet A - From Availability Zone one
         
-  # Creation of Public subnet B in the Availability Zone One: us-east-2b
+  # Creation of Public subnet B in the Availability Zone One: us-east-1b
   SecondPublicSubnet:
     Type: AWS::EC2::Subnet
     Properties:
       VpcId: !Ref MainVPC
       CidrBlock: 10.0.1.0/24
-      AvailabilityZone: !Select [ 1, !GetAZs 'us-east-2' ]
+      AvailabilityZone: !Select [ 1, !GetAZs 'us-east-1' ]
       Tags:
       - Key: Name
         Value: Public Subnet B - From Availability Zone two
@@ -71,25 +71,25 @@ Resources:
       - Key: Name
         Value: Private Subnet B - From Availability Zone one 
 
-  # Creation of Private subnet C in the Availability Zone One: us-east-2b
+  # Creation of Private subnet C in the Availability Zone One: us-east-1b
   ThirdPrivateSubnet:
     Type: AWS::EC2::Subnet
     Properties:
       VpcId: !Ref MainVPC
       CidrBlock: 10.0.4.0/24
-      AvailabilityZone: !Select [ 2, !GetAZs 'us-east-2' ]
+      AvailabilityZone: !Select [ 2, !GetAZs 'us-east-1' ]
       MapPublicIpOnLaunch: false
       Tags:
       - Key: Name
         Value: Private Subnet C - From Availability Zone two
 
-  # Creation of Private subnet D in the Availability Zone One: us-east-2b
+  # Creation of Private subnet D in the Availability Zone One: us-east-1b
   FourthPrivateSubnet:
     Type: AWS::EC2::Subnet
     Properties:
       VpcId: !Ref MainVPC
       CidrBlock: 10.0.5.0/24
-      AvailabilityZone: !Select [ 0, !GetAZs 'us-east-2' ]
+      AvailabilityZone: !Select [ 0, !GetAZs 'us-east-1' ]
       Tags:
       - Key: Name
         Value: Private Subnet D - From Availability Zone two
@@ -113,13 +113,13 @@ Resources:
       - Key: Name
         Value: NAT Gateway in the Availability Zone One
 
-  # Elastic IP for NAT Gateway in AZ2 (us-east-2b)
+  # Elastic IP for NAT Gateway in AZ2 (us-east-1b)
   NatEIPAZ2:
     Type: AWS::EC2::EIP
     Properties:
       Domain: vpc
 
-  # NAT Gateway in Public Subnet B (us-east-2b)
+  # NAT Gateway in Public Subnet B (us-east-1b)
   NatGatewayAZ2:
     Type: AWS::EC2::NatGateway
     DependsOn: AttachIGW
@@ -192,7 +192,7 @@ Resources:
       SubnetId: !Ref SecondPrivateSubnet
       RouteTableId: !Ref PrivateRouteTableAZ1
 
-  # Private Route Table for AZ2 (us-east-2b)
+  # Private Route Table for AZ2 (us-east-1b)
   PrivateRouteTableAZ2:
     Type: AWS::EC2::RouteTable
     Properties:
