@@ -44,7 +44,7 @@ Resources:
     Properties:
       VpcId: !Ref MainVPC
       CidrBlock: 10.0.1.0/24
-      AvailabilityZone: !Select [ 1, !GetAZs 'us-east-1' ]
+      AvailabilityZone: !Select [ 1, !GetAZs 'us-east-2' ]
       Tags:
       - Key: Name
         Value: Public Subnet B - From Availability Zone two
@@ -77,7 +77,7 @@ Resources:
     Properties:
       VpcId: !Ref MainVPC
       CidrBlock: 10.0.4.0/24
-      AvailabilityZone: !Select [ 2, !GetAZs 'us-east-1' ]
+      AvailabilityZone: !Select [ 2, !GetAZs 'us-east-2' ]
       MapPublicIpOnLaunch: false
       Tags:
       - Key: Name
@@ -89,7 +89,7 @@ Resources:
     Properties:
       VpcId: !Ref MainVPC
       CidrBlock: 10.0.5.0/24
-      AvailabilityZone: !Select [ 0, !GetAZs 'us-east-1' ]
+      AvailabilityZone: !Select [ 0, !GetAZs 'us-east-2' ]
       Tags:
       - Key: Name
         Value: Private Subnet D - From Availability Zone two
