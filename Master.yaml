@@ -335,7 +335,7 @@ Resources:
             #!/bin/bash
             # Instalar dependencias
             yum update -y
-            yum install -y httpd php mysql unzip
+            yum install -y httpd php unzip
             systemctl start httpd
             systemctl enable httpd
 
