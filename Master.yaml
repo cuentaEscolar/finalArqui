@@ -5,6 +5,15 @@ Parameters:
     Type: String
     Description: ARN of the autoscaling group instance profile
 Resources:
+   # Importar la clave pública generada externamente
+  ImportedKeyPair:
+    Type: AWS::EC2::KeyPair
+    Properties:
+      KeyName: "public_key"  # Nombre del key pair en AWS
+      PublicKeyMaterial: "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQCLy2dHptMDN94jchLc3Nr1HFLlNxmlenk+/fotuUvr/RQ/XZG3RmOSLiJZD0a/Xn+rirFgxT/Hy3Qhv2KfR1VYkIGB6IJhoWE+fTi92yZlUOln4E9fPl5tLWHRuTrDwPf8FoFciyJ0+JJpu0qzK+1EEzs+YKRMM1gnM+yihVnnIV3A5ymfp73ysPmwJf7Tsyx30QpkY2Fgck6XLj39X/69MYWIWldYEv3oS+ZtpHXwt6GljoQDb6snGiUbjP7Ib2FcLME5Yjy16kgv0G4ok0tMR81QkOTp8lgexOullQIvpu8BhJODyf8SESOLMmX5t4Xd9KD9vliuinXshgxwkPbR"
+      Tags:
+        - Key: Name
+          Value: "public_key"
   # Creating the VPC
   MainVPC:
     Type: AWS::EC2::VPC
@@ -270,7 +279,15 @@ Resources:
 
 #------------------------------------------------RDS--------------------------------------
   
-
+  DBSecret:
+      Type: AWS::SecretsManager::Secret
+      Properties:
+        Name: !Sub ${AWS::StackName}-db-credentials
+        GenerateSecretString:
+          SecretStringTemplate: '{"username": "admin"}'
+          GenerateStringKey: "password"
+          PasswordLength: 16
+          ExcludeCharacters: '"@/\'
 
 
   MyDatabaseSecurityGroup:
@@ -292,7 +309,7 @@ Resources:
     Properties:
       DBSubnetGroupDescription: "Subredes privadas para la base de datos"
       SubnetIds:
-        - !Ref ThirdPrivateSubnet #subnet C
+        - !Ref SecondPrivateSubnet #subnet B
         - !Ref FourthPrivateSubnet #subnet D
       Tags:
         - Key: Name
@@ -300,6 +317,9 @@ Resources:
 
   MyDatabase:
     Type: AWS::RDS::DBInstance
+    DependsOn: 
+      - MyDatabaseSecurityGroup
+      - DBSecret
     DeletionPolicy: 'Delete'
     UpdateReplacePolicy: 'Delete'
     Properties:
@@ -307,8 +327,8 @@ Resources:
       AllocatedStorage: 20
       DBInstanceClass: db.t3.micro
       Engine: mysql
-      MasterUsername: admin
-      ManageMasterUserPassword: true
+      MasterUsername: !Sub '{{resolve:secretsmanager:${DBSecret}::username}}'
+      MasterUserPassword: !Sub '{{resolve:secretsmanager:${DBSecret}::password}}'
       VPCSecurityGroups:
         - !Ref MyDatabaseSecurityGroup
       DBSubnetGroupName: !Ref DBSubnetGroup
@@ -325,39 +345,60 @@ Resources:
       LaunchTemplateData:
         ImageId: ami-00a929b66ed6e0de6
         InstanceType: t2.micro
+        KeyName: !Ref ImportedKeyPair
         IamInstanceProfile:
           Arn: !Ref InstanceProfileArn
         SecurityGroupIds:
-        - !Ref SSHSecurityGroup
-        - !Ref WebServerSecurityGroup  # AÑADIDO: Security Group para permitir tráfico HTT
+          - !Ref SSHSecurityGroup
+          - !Ref WebServerSecurityGroup
         UserData: 
           Fn::Base64: |
             #!/bin/bash
-            # Instalar dependencias
+            # Instalar dependencias + herramientas de MySQL
             yum update -y
-            yum install -y httpd php unzip
+            yum install -y httpd php unzip mariadb-server jq
+
+            # Iniciar servicios
             systemctl start httpd
             systemctl enable httpd
 
-            # Descargar y descomprimir el ZIP desde el enlace público
+            # Descargar aplicación web
             wget https://aws-tc-largeobjects.s3.us-west-2.amazonaws.com/CUR-TF-200-ACACAD-3-113230/22-lab-Capstone-project/s3/Example.zip -O /tmp/webapp.zip
             unzip /tmp/webapp.zip -d /var/www/html/
 
-            # Ajustar permisos
-            chown -R apache:apache /var/www/html/
-            chmod -R 755 /var/www/html/
+            # --- Configuración de RDS ---
+            # Obtener credenciales de Secrets Manager
+            SECRET_ARN=$(aws secretsmanager describe-secret --secret-id ${DBSecret} --query 'ARN' --output text --region us-east-1)
+            DB_USER=$(aws secretsmanager get-secret-value --secret-id $SECRET_ARN --query 'SecretString' --output text | jq -r '.username')
+            DB_PASSWORD=$(aws secretsmanager get-secret-value --secret-id $SECRET_ARN --query 'SecretString' --output text | jq -r '.password')
+            DB_ENDPOINT=$(aws rds describe-db-instances --db-instance-identifier countries-2 --query 'DBInstances[0].Endpoint.Address' --output text --region us-east-1)
 
-            # Reiniciar Apache
+            # --- Ejemplo: Migración de datos ---
+            # 1. Crear dump de la base local (si existe)
+            mysqldump -u root --databases mi_basedatos > /tmp/dump.sql  # Ajusta según tu caso
+
+            # 2. Importar dump a RDS
+            mysql -h $DB_ENDPOINT -u $DB_USER -p$DB_PASSWORD < /tmp/dump.sql
+
+            # --- Configurar aplicación ---
+            # Reemplazar configuración en archivos PHP
+            sed -i "s/localhost/$DB_ENDPOINT/g" /var/www/html/config.php
+            sed -i "s/root_user/$DB_USER/g" /var/www/html/config.php
+            sed -i "s/root_password/$DB_PASSWORD/g" /var/www/html/config.php
+
+            # Permisos y reinicio
+            chown -R apache:apache /var/www/html/
             systemctl restart httpd
+
         TagSpecifications:
-        - ResourceType: instance
-          Tags:
-          - Key: environment
-            Value: development
-        - ResourceType: volume
-          Tags:
-          - Key: environment
-            Value: development
+          - ResourceType: instance
+            Tags:
+              - Key: environment
+                Value: development
+          - ResourceType: volume
+            Tags:
+              - Key: environment
+                Value: development
 
 #---------------------------------  Application Load Balancer --------------------------
   IncomingTrafficLoadBalancer:
@@ -453,5 +494,13 @@ Outputs:
   LoadBalancerDNS:
     Description: "DNS del Load Balancer para acceder a la aplicación web"
     Value: !GetAtt IncomingTrafficLoadBalancer.DNSName
+
+  SecretARN:
+    Description: "ARN del secreto con credenciales"
+    Value: !Ref DBSecret
+
+  KeyPairName:
+    Description: Nombre del Key Pair importado para SSH
+    Value: !Ref ImportedKeyPair
 
 
