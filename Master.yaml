@@ -353,7 +353,7 @@ Resources:
     DeletionPolicy: 'Delete'
     UpdateReplacePolicy: 'Delete'
     Properties:
-      DBInstanceIdentifier: countries-2
+      DBInstanceIdentifier: countries
       AllocatedStorage: 20
       DBInstanceClass: db.t3.micro
       Engine: mysql
@@ -363,9 +363,32 @@ Resources:
         - !Ref MyDatabaseSecurityGroup
       DBSubnetGroupName: !Ref DBSubnetGroup
       BackupRetentionPeriod: 7
-      MultiAZ: true  # Alta disponibilidad en múltiples AZ
+      MultiAZ: true # Alta disponibilidad en múltiples AZ
       PubliclyAccessible: false  # Solo accesible en subredes privadas
-    
+
+
+  MySecondDatabase:
+    Type: AWS::RDS::DBInstance
+    DependsOn: 
+      - MyDatabaseSecurityGroup
+      - DBSecret
+    DeletionPolicy: 'Delete'
+    UpdateReplacePolicy: 'Delete'
+    Properties:
+      DBInstanceIdentifier: countries-read
+      AllocatedStorage: 20
+      DBInstanceClass: db.t3.micro
+      Engine: mysql
+      MasterUsername: !Sub '{{resolve:secretsmanager:${DBSecret}::username}}'
+      MasterUserPassword: !Sub '{{resolve:secretsmanager:${DBSecret}::password}}'
+      VPCSecurityGroups:
+        - !Ref MyDatabaseSecurityGroup
+      DBSubnetGroupName: !Ref DBSubnetGroup
+      BackupRetentionPeriod: 7
+      MultiAZ: true # Alta disponibilidad en múltiples AZ
+      PubliclyAccessible: false  # Solo accesible en subredes privadas
+
+
   # Bastion Host in Public Subnet A (AZ1)
   BastionHostAZ1:
     Type: AWS::EC2::Instance
@@ -536,6 +559,21 @@ Resources:
       LoadBalancerArn: !Ref IncomingTrafficLoadBalancer
       Port: 80
       Protocol: HTTP
+
+#----- AutoScaling policy
+  TargetTrackingASP:
+    Type: AWS::AutoScaling::ScalingPolicy
+    Properties:
+      AdjustmentType: String
+      AutoScalingGroupName: !Ref WebServerASG
+      PolicyType: TargetTrackingScaling
+      TargetTrackingConfiguration: 
+        PredefinedMetricSpecification:
+          PredefinedMetricType: ALBRequestCountPerTarget
+          ResourceLabel: !Ref IncomingTargetGroup
+            
+
+
 #--------------------------------------Auto Scaling Group-------------------------------
   WebServerASG:
     Type: AWS::AutoScaling::AutoScalingGroup
@@ -546,13 +584,13 @@ Resources:
         - "us-east-1a"
         - "us-east-1b"
       DefaultInstanceWarmup: 0
-      DesiredCapacity: 1
+      DesiredCapacity: 2
       #DesiredCapacityType: vcpu
       LaunchTemplate: 
         LaunchTemplateId: !Ref LaunchTemplateEc2Micro
         Version: !GetAtt LaunchTemplateEc2Micro.LatestVersionNumber
       MaxSize: 4
-      MinSize: 1
+      MinSize: 2
       NewInstancesProtectedFromScaleIn: false
       #PlacementGroup: String
       #ServiceLinkedRoleARN: String
