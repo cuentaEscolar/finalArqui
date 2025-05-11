@@ -571,6 +571,7 @@ Resources:
         PredefinedMetricSpecification:
           PredefinedMetricType: ALBRequestCountPerTarget
           ResourceLabel: !Ref IncomingTargetGroup
+        TargetValue: 1000
             
 
 
