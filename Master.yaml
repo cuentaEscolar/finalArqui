@@ -501,7 +501,8 @@ Resources:
             # Ajustar permisos
             chown -R apache:apache /var/www/html/
             chmod -R 755 /var/www/html/
-
+            # Crear health.html
+            sudo echo '<!DOCTYPE html> <html> <head> <title>Health Check</title> </head> <body> OK </body> </html>' > /var/www/html/health.html
             # Reiniciar Apache
             systemctl restart httpd
         TagSpecifications:
@@ -527,11 +528,11 @@ Resources:
       VpcId: !Ref MainVPC
       TargetType: instance
       HealthCheckProtocol: HTTP
-      HealthCheckPath: /health.html  # AQUÍ: Cambiar a /health.html para usar el archivo específico
-      HealthCheckIntervalSeconds: 30  # AQUÍ: Añadir configuración de health check
-      HealthCheckTimeoutSeconds: 5   # AQUÍ: Añadir configuración de health check
-      HealthyThresholdCount: 2       # AQUÍ: Añadir configuración de health check
-      UnhealthyThresholdCount: 2     # AQUÍ: Añadir configuración de health check
+      HealthCheckPath: /health.html  # 
+      HealthCheckIntervalSeconds: 30  #
+      HealthCheckTimeoutSeconds: 5   #
+      HealthyThresholdCount: 2       #
+      UnhealthyThresholdCount: 2     #
       Matcher:
         HttpCode: 200
 
