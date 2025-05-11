@@ -490,9 +490,22 @@ Resources:
             # Instalar dependencias
             yum update -y
             yum install -y httpd php unzip
+            yum install -y php-mysqli
             sudo yes | dnf install mariadb105
             systemctl start httpd
             systemctl enable httpd
+
+            #php sdk
+            php -r "copy('https://getcomposer.org/installer', 'composer-setup.php');"
+            php -r "if (hash_file('sha384', 'composer-setup.php') === 'dac665fdc30fdd8ec78b38b9800061b4150413ff2e3b6f88543c636f7cd84f6db9189d43a81e5503cda447da73c7e5b6') { echo 'Installer verified'.PHP_EOL; } else { echo 'Installer corrupt'.PHP_EOL; unlink('composer-setup.php'); exit(1); }"
+            php composer-setup.php
+            mv composer.phar /usr/local/bin/composer
+            composer require aws/aws-sdk-php --working-dir /usr/share/php
+            mv /usr/share/php/vendor/* /usr/share/php/
+            mv /usr/share/php/autoload.php /usr/share/php/aws-autoloader.php
+
+            php -r "unlink('composer-setup.php');"
+
 
             # Descargar y descomprimir el ZIP desde el enlace público
             wget https://aws-tc-largeobjects.s3.us-west-2.amazonaws.com/CUR-TF-200-ACACAD-3-113230/22-lab-Capstone-project/s3/Example.zip -O /tmp/webapp.zip
