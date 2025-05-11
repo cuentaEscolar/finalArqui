@@ -490,6 +490,7 @@ Resources:
             # Instalar dependencias
             yum update -y
             yum install -y httpd php unzip
+            sudo yes | dnf install mariadb105
             systemctl start httpd
             systemctl enable httpd
 
@@ -512,20 +513,6 @@ Resources:
           Tags:
           - Key: environment
             Value: development
-
-#---------------------------------  Application Load Balancer --------------------------
-  IncomingTrafficLoadBalancer:
-    Type: AWS::ElasticLoadBalancingV2::LoadBalancer
-    Properties:
-      IpAddressType: ipv4
-      Name: IncomingTrafficLoadBalancer
-      Scheme: internet-facing
-      SecurityGroups:
-        - !Ref ALBSecurityGroup  # AQUÍ: Añadir referencia al Security Group nuevo
-      Subnets: 
-        - !Ref FirstPublicSubnet
-        - !Ref SecondPublicSubnet
-      Type: application
 
 
 
@@ -560,6 +547,21 @@ Resources:
       Port: 80
       Protocol: HTTP
 
+#---------------------------------  Application Load Balancer --------------------------
+  IncomingTrafficLoadBalancer:
+    Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+    Properties:
+      IpAddressType: ipv4
+      Name: IncomingTrafficLoadBalancer
+      Scheme: internet-facing
+      SecurityGroups:
+        - !Ref ALBSecurityGroup  # AQUÍ: Añadir referencia al Security Group nuevo
+      Subnets: 
+        - !Ref FirstPublicSubnet
+        - !Ref SecondPublicSubnet
+      Type: application
+
+
 #----- AutoScaling policy
   TargetTrackingASP:
     Type: AWS::AutoScaling::ScalingPolicy
@@ -570,7 +572,10 @@ Resources:
       TargetTrackingConfiguration: 
         PredefinedMetricSpecification:
           PredefinedMetricType: ALBRequestCountPerTarget
-          ResourceLabel: !Ref IncomingTargetGroup
+          ResourceLabel: !Join 
+            - '/' 
+            - - !GetAtt IncomingTrafficLoadBalancer.LoadBalancerFullName
+              - !GetAtt IncomingTargetGroup.TargetGroupFullName
         TargetValue: 1000
             
 
