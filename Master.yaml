@@ -9,7 +9,7 @@ Parameters:
     Default: t2.micro
     Description: EC2 instance type for the bastion hosts
     
-Resources:
+Resources:  
    # Importar la clave pública generada externamente
   ImportedKeyPair:
     Type: AWS::EC2::KeyPair
@@ -318,6 +318,8 @@ Resources:
           GenerateStringKey: "password"
           PasswordLength: 16
           ExcludeCharacters: '"@/\'
+      UpdateReplacePolicy: Delete  # Eliminar el secreto al actualizar la pila
+      DeletionPolicy: Delete  # Eliminar el secreto al eliminar la pila
 
 
   MyDatabaseSecurityGroup:
@@ -330,9 +332,6 @@ Resources:
             FromPort: 3306
             ToPort: 3306
             CidrIp: 10.0.0.0/16
-        Tags:
-          - Key: Name
-            Value: !Ref BastionSecurityGroup
 
   DBSubnetGroup:
     Type: AWS::RDS::DBSubnetGroup
@@ -347,9 +346,6 @@ Resources:
 
   MyDatabase:
     Type: AWS::RDS::DBInstance
-    DependsOn: 
-      - MyDatabaseSecurityGroup
-      - DBSecret
     DeletionPolicy: 'Delete'
     UpdateReplacePolicy: 'Delete'
     Properties:
@@ -480,15 +476,17 @@ Resources:
 
             # Reiniciar Apache
             systemctl restart httpd
+  
+
         TagSpecifications:
-        - ResourceType: instance
-          Tags:
-          - Key: environment
-            Value: development
-        - ResourceType: volume
-          Tags:
-          - Key: environment
-            Value: development
+          - ResourceType: instance
+            Tags:
+              - Key: environment
+                Value: development
+          - ResourceType: volume
+            Tags:
+              - Key: environment
+                Value: development
 
 #---------------------------------  Application Load Balancer --------------------------
   IncomingTrafficLoadBalancer:
@@ -539,12 +537,11 @@ Resources:
 #--------------------------------------Auto Scaling Group-------------------------------
   WebServerASG:
     Type: AWS::AutoScaling::AutoScalingGroup
-    DependsOn: LaunchTemplateEc2Micro
     Properties:
       AutoScalingGroupName: !Sub ${AWS::StackName}-ASG
       AvailabilityZones: 
-        - "us-east-1a"
-        - "us-east-1b"
+        - !Select [ 0, !GetAZs 'us-east-1' ]
+        - !Select [ 1, !GetAZs 'us-east-1' ]
       DefaultInstanceWarmup: 0
       DesiredCapacity: 1
       #DesiredCapacityType: vcpu
