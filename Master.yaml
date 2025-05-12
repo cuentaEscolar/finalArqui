@@ -529,8 +529,7 @@ Resources:
               unzip /tmp/webapp.zip -d /var/www/html/
               chown -R apache:apache /var/www/html/
               chmod -R 755 /var/www/html/
-              cd /var/www/html
-              sed -i "s/\$conn = new mysqli(\$_SESSION\['ep'\], \$_SESSION\['un'\], \$_SESSION\['pw'\], \$_SESSION\['db'\]);/\$conn = new mysqli(\$ep, \$un, \$pw, \$db);/g" lifeexpectancy.php
+              sed -i "s/\$conn = new mysqli(\$_SESSION\['ep'\], \$_SESSION\['un'\], \$_SESSION\['pw'\], \$_SESSION\['db'\]);/\$conn = new mysqli(\$ep, \$un, \$pw, \$db);/g" /var/www/html/lifeexpectancy.php
 
               echo '<!DOCTYPE html><html><head><title>Health Check</title></head><body>OK</body></html>' > /var/www/html/health.html
               systemctl restart httpd
