@@ -534,7 +534,7 @@ Resources:
               DB_USER=${DBUsernameParameter.Value}
               echo "Using DB_USER=$DB_USER" >> /var/log/init.log 
               DB_PASS=$(printf '%q' "${DBPasswordParameter.Value}")
-              DB_ENDPOINT"${MyDatabase.Endpoint.Address}";
+              DB_ENDPOINT="${MyDatabase.Endpoint.Address}";
 
               # Download SQL dump
               curl https://aws-tc-largeobjects.s3.us-west-2.amazonaws.com/CUR-TF-200-ACACAD-3-113230/22-lab-Capstone-project/s3/Countrydatadump.sql ;
@@ -558,6 +558,7 @@ Resources:
 
               echo '<!DOCTYPE html><html><head><title>Health Check</title></head><body>OK</body></html>' > /var/www/html/health.html
               #populate 
+              echo  "-h" $DB_ENDPOINT "-u" "$DB_USER" "-p" "$DB_PASS" ;
               echo "exit;" |  mysql -h $DB_ENDPOINT -u "$DB_USER" -p"$DB_PASS" ;
               echo "CREATE DATABASE countries;" |  mysql -h $DB_ENDPOINT -u "$DB_USER" -p"$DB_PASS" ;
               mysql -h ${MyDatabase.Endpoint.Address} -u $DB_USER -p'$DB_PASS' < /tmp/dumpy.sql;
