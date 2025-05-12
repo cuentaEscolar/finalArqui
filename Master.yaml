@@ -24,8 +24,8 @@ Resources:
     Type: AWS::EC2::VPC
     Properties:
       CidrBlock: 10.0.0.0/16
-      EnableDnsHostnames: 'true'
-      EnableDnsSupport: 'true'
+      EnableDnsHostnames: True
+      EnableDnsSupport: True
       Tags:
       - Key: Name
         Value: VPC for the final project
@@ -319,6 +319,21 @@ Resources:
           PasswordLength: 16
           ExcludeCharacters: '"@/\'
 
+  DBUsernameParameter:
+    Type: AWS::SSM::Parameter
+    DependsOn: DBSecret
+    Properties:
+      Name: "/myapp/db/username"
+      Type: String
+      Value: !Sub "{{resolve:secretsmanager:${DBSecret}::username}}"
+
+  DBPasswordParameter:
+    Type: AWS::SSM::Parameter
+    DependsOn: DBSecret
+    Properties:
+      Name: "/myapp/db/password"
+      Type: String
+      Value: !Sub "{{resolve:secretsmanager:${DBSecret}::password}}"
 
   MyDatabaseSecurityGroup:
       Type: AWS::EC2::SecurityGroup
@@ -472,6 +487,10 @@ Resources:
 #------------------------------------------------EC2_TEMPLATE-----------------------------------------------
   LaunchTemplateEc2Micro:
     Type: AWS::EC2::LaunchTemplate
+    DependsOn:
+      - DBUsernameParameter
+      - DBPasswordParameter
+      - MyDatabase
     Properties:
       LaunchTemplateName: !Sub ${AWS::StackName}-launch-template
       LaunchTemplateData:
@@ -484,40 +503,36 @@ Resources:
         #eliminé el sshSecurity Group ya que como se accede mediante el bastion hsot ya es inutil 
           - !Ref WebServerSecurityGroup
           - !Ref PrivateInstanceSecurityGroup  # Add this to allow SSH from bastion hosts
-        UserData: 
-          Fn::Base64: |
-            #!/bin/bash
-            # Instalar dependencias
-            yum update -y
-            yum install -y httpd php unzip
-            yum install -y php-mysqli
-            sudo yes | dnf install mariadb105
-            systemctl start httpd
-            systemctl enable httpd
 
-            #php sdk
-            php -r "copy('https://getcomposer.org/installer', 'composer-setup.php');"
-            php -r "if (hash_file('sha384', 'composer-setup.php') === 'dac665fdc30fdd8ec78b38b9800061b4150413ff2e3b6f88543c636f7cd84f6db9189d43a81e5503cda447da73c7e5b6') { echo 'Installer verified'.PHP_EOL; } else { echo 'Installer corrupt'.PHP_EOL; unlink('composer-setup.php'); exit(1); }"
-            php composer-setup.php
-            mv composer.phar /usr/local/bin/composer
-            composer require aws/aws-sdk-php --working-dir /usr/share/php
-            mv /usr/share/php/vendor/* /usr/share/php/
-            mv /usr/share/php/autoload.php /usr/share/php/aws-autoloader.php
+        UserData:
+          Fn::Base64: 
+            !Sub |
+              #!/bin/bash
+              yum update -y
+              yum install -y awscli jq mariadb105 php httpd php-mysqli unzip
 
-            php -r "unlink('composer-setup.php');"
+              # Start Apache
+              systemctl start httpd
+              systemctl enable httpd
 
+              # Fetch DB credentials from Secrets Manager
 
-            # Descargar y descomprimir el ZIP desde el enlace público
-            wget https://aws-tc-largeobjects.s3.us-west-2.amazonaws.com/CUR-TF-200-ACACAD-3-113230/22-lab-Capstone-project/s3/Example.zip -O /tmp/webapp.zip
-            unzip /tmp/webapp.zip -d /var/www/html/
+              DB_USER = ${DBUsernameParameter.Value}
+              DB_PASS = ${DBPasswordParameter.Value}
+              # Download SQL dump
+              wget https://aws-tc-largeobjects.s3.us-west-2.amazonaws.com/CUR-TF-200-ACACAD-3-113230/22-lab-Capstone-project/s3/Countrydatadump.sql -O /tmp/dumpy.sql
 
-            # Ajustar permisos
-            chown -R apache:apache /var/www/html/
-            chmod -R 755 /var/www/html/
-            # Crear health.html
-            sudo echo '<!DOCTYPE html> <html> <head> <title>Health Check</title> </head> <body> OK </body> </html>' > /var/www/html/health.html
-            # Reiniciar Apache
-            systemctl restart httpd
+              # Import into database
+              mysql -h ${MyDatabase.Endpoint.Address} -u $DB_USER -p$DB_PASS < /tmp/dumpy.sql
+
+              # Deploy web app
+              unzip /tmp/webapp.zip -d /var/www/html/
+              chown -R apache:apache /var/www/html/
+              chmod -R 755 /var/www/html/
+
+              echo '<!DOCTYPE html><html><head><title>Health Check</title></head><body>OK</body></html>' > /var/www/html/health.html
+              systemctl restart httpd
+
         TagSpecifications:
         - ResourceType: instance
           Tags:
