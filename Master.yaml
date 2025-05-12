@@ -516,25 +516,40 @@ Resources:
               systemctl enable httpd
 
               sudo php -r "copy('https://getcomposer.org/installer', 'composer-setup.php');"
+
+              HASH=$(curl -s https://composer.github.io/installer.sig)
+              php -r "if (hash_file('sha384', 'composer-setup.php') !== '$HASH') { echo 'Invalid Composer installer'; exit(1); }"
+
               sudo php -r "if (hash_file('sha384', 'composer-setup.php') === 'dac665fdc30fdd8ec78b38b9800061b4150413ff2e3b6f88543c636f7cd84f6db9189d43a81e5503cda447da73c7e5b6') { echo 'Installer verified'.PHP_EOL; } else { echo 'Installer corrupt'.PHP_EOL; unlink('composer-setup.php'); exit(1); }"
               sudo php composer-setup.php
               sudo mv composer.phar /usr/local/bin/composer
-              yes | sudo composer require aws/aws-sdk-php --working-dir /usr/share/php
+
+              sudo composer init --no-interaction
+              sudo composer require aws/aws-sdk-php --working-dir /usr/share/php
               sudo mv /usr/share/php/vendor/* /usr/share/php/
               sudo mv /usr/share/php/autoload.php /usr/share/php/aws-autoloader.php
 
               # Fetch DB credentials from Secrets Manager
 
-              DB_USER = ${DBUsernameParameter.Value}
-              DB_PASS = ${DBPasswordParameter.Value}
+              export DB_USER=${DBUsernameParameter.Value}
+              echo "Using DB_USER=$DB_USER" >> /var/log/init.log
+              export DB_PASS=${DBPasswordParameter.Value}
+
               # Download SQL dump
               wget https://aws-tc-largeobjects.s3.us-west-2.amazonaws.com/CUR-TF-200-ACACAD-3-113230/22-lab-Capstone-project/s3/Countrydatadump.sql -O /tmp/dumpy.sql
 
               # Import into database
-              mysql -h ${MyDatabase.Endpoint.Address} -u $DB_USER -p$DB_PASS < /tmp/dumpy.sql
+            
+              echo ${MyDatabase.Endpoint.Address} 
+              echo "${DBUsernameParameter.Value}" 
+              echo "${DBPasswordParameter.Value}" 
+              echo "hi"
+              echo "CREATE DATABASE countries;" |  mysql -h ${MyDatabase.Endpoint.Address} -u "$DB_USER" -p'${DBPasswordParameter.Value}' 
+              mysql -h ${MyDatabase.Endpoint.Address} -u $DB_USER -p'$DB_PASS' < /tmp/dumpy.sql
 
               # Deploy web app
               #
+            
               wget https://aws-tc-largeobjects.s3.us-west-2.amazonaws.com/CUR-TF-200-ACACAD-3-113230/22-lab-Capstone-project/s3/Example.zip -O /tmp/webapp.zip
               unzip /tmp/webapp.zip -d /var/www/html/
               chown -R apache:apache /var/www/html/
